@@ -1,0 +1,8 @@
+{
+  "name": "addy-ai-system",
+  "private": true,
+  "scripts": {
+    "dashboard:dev": "cd dashboard/nextjs-app && npm run dev",
+    "dashboard:build": "cd dashboard/nextjs-app && npm run build"
+  }
+}
