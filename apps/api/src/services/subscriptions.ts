@@ -2,18 +2,28 @@ import { hasFeatureAccess } from "@addy/shared";
 import { prisma } from "../lib/prisma.js";
 
 export const resolveGuildPlan = async (guildId: string, botKey: string): Promise<string> => {
-  const sub = await prisma.subscription.findFirst({
-    where: { guildId, OR: [{ botConfigId: null }, { botConfigId: botKey }] },
-    orderBy: { createdAt: "desc" }
+  const latestSubscription = await prisma.subscription.findFirst({
+    where: {
+      guildId,
+      OR: [
+        { botConfigId: null },
+        {
+          botConfig: { key: botKey }
+        }
+      ]
+    },
+    orderBy: { startedAt: "desc" }
   });
 
-  if (!sub) {
+  if (!latestSubscription) {
     return "FREE";
   }
-  if (sub.expiresAt && sub.expiresAt < new Date()) {
+
+  if (latestSubscription.expiresAt && latestSubscription.expiresAt < new Date()) {
     return "FREE";
   }
-  return sub.planCode;
+
+  return latestSubscription.planCode;
 };
 
 export const canUseFeature = async (guildId: string, botKey: string, feature: string): Promise<boolean> => {

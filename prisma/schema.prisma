@@ -131,6 +131,7 @@ model BotConfig {
   dashboardRoute  String
   installs        GuildBotInstall[]
   pricingRules    PricingRule[]
+  subscriptions   Subscription[]
 }
 
 model GuildBotInstall {
@@ -170,6 +171,10 @@ model Subscription {
   isPremium     Boolean  @default(false)
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   guild         Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  botConfig     BotConfig? @relation(fields: [botConfigId], references: [id], onDelete: SetNull)
+
+  @@index([guildId, botConfigId])
+  @@index([userId, startedAt])
 }
 
 model Payment {

@@ -26,8 +26,28 @@ guildRouter.post("/sync", async (req: AuthRequest, res) => {
       ownerDiscordId: payload.ownerDiscordId,
       internalCode: `ADDY-${nanoid(10)}`
     },
-    update: { name: payload.name }
+    update: { name: payload.name, ownerDiscordId: payload.ownerDiscordId }
   });
+
+  await prisma.guildMember.upsert({
+    where: {
+      guildId_userId: {
+        guildId: guild.id,
+        userId: req.userId!
+      }
+    },
+    create: {
+      guildId: guild.id,
+      userId: req.userId!,
+      isOwner: true,
+      canManage: true
+    },
+    update: {
+      isOwner: true,
+      canManage: true
+    }
+  });
+
   res.json({ guild });
 });
 
