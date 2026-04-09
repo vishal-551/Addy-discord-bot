@@ -1,18 +1,15 @@
-import { SlashCommandBuilder } from "discord.js";
-import { runBot } from "../../_core/src/framework.js";
+import { startBot } from "@addy/bot-core";
+import { coreCommands } from "./commands/core.js";
+import { config } from "./config.js";
+import { onReadyNote } from "./events/ready.js";
 
-runBot({
-  botKey: "addy-main",
-  token: process.env.ADDY_MAIN_TOKEN ?? "",
-  clientId: process.env.ADDY_MAIN_CLIENT_ID ?? "",
-  commands: [
-    {
-      data: new SlashCommandBuilder().setName("ping").setDescription("Check bot latency"),
-      execute: async ({ interaction }) => interaction.reply("Addy Main online ✅")
-    },
-    {
-      data: new SlashCommandBuilder().setName("status").setDescription("View platform status"),
-      execute: async ({ interaction }) => interaction.reply("All Addy services nominal. Dashboard + API connected.")
-    }
-  ]
+void startBot({
+  key: config.key,
+  displayName: config.displayName,
+  token: config.token,
+  clientId: config.clientId,
+  guildId: process.env.ADDY_DEV_GUILD_ID,
+  commands: coreCommands
+}).then(() => {
+  console.log(onReadyNote);
 });

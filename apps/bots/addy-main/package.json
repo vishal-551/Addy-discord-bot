@@ -9,7 +9,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "discord.js": "^14.17.3"
+    "discord.js": "^14.17.3",
+    "@addy/bot-core": "workspace:*",
+    "@addy/shared": "workspace:*"
   },
   "devDependencies": {
     "tsx": "^4.19.2",

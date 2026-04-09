@@ -10,6 +10,8 @@ paymentRouter.post("/checkout", async (req: AuthRequest, res) => {
   const parsed = paymentCreateSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json(parsed.error.flatten());
 
+  const paymentStatus = parsed.data.provider === "MANUAL" || parsed.data.provider === "UPI" ? "PENDING" : "APPROVED";
+
   const payment = await prisma.payment.create({
     data: {
       userId: req.userId!,
@@ -18,12 +20,26 @@ paymentRouter.post("/checkout", async (req: AuthRequest, res) => {
       planCode: parsed.data.planCode,
       provider: parsed.data.provider,
       amount: parsed.data.amount,
-      status: parsed.data.provider === "MANUAL" || parsed.data.provider === "UPI" ? "PENDING" : "APPROVED",
+      status: paymentStatus,
       metadata: { coupon: parsed.data.coupon ?? null }
     }
   });
 
-  res.json({ payment, nextAction: payment.status === "PENDING" ? "WAIT_MANUAL_REVIEW" : "ACTIVATE_NOW" });
+  if (paymentStatus === "APPROVED") {
+    const bot = await prisma.botConfig.findUnique({ where: { key: parsed.data.botKey } });
+    await prisma.subscription.create({
+      data: {
+        userId: req.userId!,
+        guildId: parsed.data.guildId,
+        botConfigId: bot?.id,
+        planCode: parsed.data.planCode,
+        isPremium: parsed.data.planCode !== "FREE",
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+      }
+    });
+  }
+
+  res.json({ payment, nextAction: paymentStatus === "PENDING" ? "WAIT_MANUAL_REVIEW" : "ACTIVATE_NOW" });
 });
 
 paymentRouter.get("/history", async (req: AuthRequest, res) => {
