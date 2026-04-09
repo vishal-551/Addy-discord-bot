@@ -2,20 +2,23 @@
   "name": "addy-platform",
   "private": true,
   "version": "1.0.0",
-  "packageManager": "pnpm@9.12.3",
+  "packageManager": "pnpm@9.12.0",
   "scripts": {
-    "dev": "turbo run dev --parallel",
     "build": "turbo run build",
+    "dev": "turbo run dev --parallel",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate dev",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:migrate": "prisma migrate dev"
   },
   "devDependencies": {
-    "prisma": "^5.20.0",
-    "turbo": "^2.1.2",
-    "tsx": "^4.19.1",
-    "typescript": "^5.6.2"
+    "@types/node": "^22.10.5",
+    "prisma": "^6.5.0",
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.2"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.5.0",
+    "zod": "^3.24.1"
   }
 }

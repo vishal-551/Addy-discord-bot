@@ -2,46 +2,52 @@ import { Router } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { z } from "zod";
+import { env } from "../lib/env.js";
 import { prisma } from "../lib/prisma.js";
-import { env } from "../config/env.js";
-import { requireAuth, AuthRequest } from "../middleware/auth.js";
+import { requireAuth, type AuthRequest } from "../middleware/auth.js";
 
-const router = Router();
-const credentialsSchema = z.object({ email: z.string().email(), password: z.string().min(8) });
+export const authRouter = Router();
 
-router.post("/signup", async (req, res) => {
-  const parsed = credentialsSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json(parsed.error.flatten());
-  const passwordHash = await bcrypt.hash(parsed.data.password, 10);
-  const user = await prisma.user.create({ data: { email: parsed.data.email, passwordHash } });
-  const token = jwt.sign({ id: user.id, role: user.role }, env.jwtSecret, { expiresIn: "7d" });
-  res.json({ token, user });
+const signupSchema = z.object({ email: z.string().email(), password: z.string().min(8) });
+const loginSchema = signupSchema;
+
+authRouter.post("/signup", async (req, res) => {
+  const input = signupSchema.safeParse(req.body);
+  if (!input.success) return res.status(400).json(input.error.flatten());
+
+  const existing = await prisma.user.findUnique({ where: { email: input.data.email } });
+  if (existing) return res.status(409).json({ error: "Email already used" });
+
+  const passwordHash = await bcrypt.hash(input.data.password, 10);
+  const user = await prisma.user.create({ data: { email: input.data.email, passwordHash } });
+
+  const token = jwt.sign({ sub: user.id, role: user.role }, env.jwtSecret, { expiresIn: "7d" });
+  res.json({ token, user: { id: user.id, email: user.email, role: user.role } });
 });
 
-router.post("/login", async (req, res) => {
-  const parsed = credentialsSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json(parsed.error.flatten());
-  const user = await prisma.user.findUnique({ where: { email: parsed.data.email } });
-  if (!user || !(await bcrypt.compare(parsed.data.password, user.passwordHash))) {
-    return res.status(401).json({ error: "Invalid credentials" });
-  }
-  const token = jwt.sign({ id: user.id, role: user.role }, env.jwtSecret, { expiresIn: "7d" });
-  res.json({ token, user });
+authRouter.post("/login", async (req, res) => {
+  const input = loginSchema.safeParse(req.body);
+  if (!input.success) return res.status(400).json(input.error.flatten());
+
+  const user = await prisma.user.findUnique({ where: { email: input.data.email } });
+  if (!user || !user.passwordHash) return res.status(401).json({ error: "Invalid credentials" });
+
+  const valid = await bcrypt.compare(input.data.password, user.passwordHash);
+  if (!valid) return res.status(401).json({ error: "Invalid credentials" });
+
+  const token = jwt.sign({ sub: user.id, role: user.role }, env.jwtSecret, { expiresIn: "7d" });
+  res.json({ token, user: { id: user.id, email: user.email, role: user.role } });
 });
 
-router.get("/me", requireAuth, async (req: AuthRequest, res) => {
-  const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
+authRouter.get("/discord/url", (_req, res) => {
+  const scope = encodeURIComponent("identify guilds guilds.members.read");
+  const redirect = encodeURIComponent(env.discordRedirectUri);
+  const url = `https://discord.com/api/oauth2/authorize?client_id=${env.discordClientId}&redirect_uri=${redirect}&response_type=code&scope=${scope}`;
+  res.json({ url });
+});
+
+authRouter.get("/me", requireAuth, async (req: AuthRequest, res) => {
+  const user = await prisma.user.findUnique({ where: { id: req.userId } });
+  if (!user) return res.status(404).json({ error: "User not found" });
   res.json({ user });
 });
-
-router.get("/discord/start", (_req, res) => {
-  res.json({
-    authorizeUrl: `https://discord.com/oauth2/authorize?client_id=${process.env.DISCORD_CLIENT_ID}&response_type=code&redirect_uri=${encodeURIComponent(process.env.DISCORD_REDIRECT_URI ?? "")}&scope=identify%20guilds`
-  });
-});
-
-router.get("/discord/callback", async (_req, res) => {
-  res.json({ message: "Discord OAuth callback endpoint ready. Exchange code in production adapter." });
-});
-
-export default router;

@@ -1,43 +1,86 @@
 # Addy Platform Monorepo
 
-Production-oriented monorepo for the **Addy** multi-bot Discord SaaS ecosystem.
+Addy is a multi-bot Discord SaaS ecosystem with:
+- Premium static marketing website (`apps/website`)
+- User dashboard (`apps/dashboard`)
+- Super admin control panel (`apps/admin`)
+- API backend with auth, guild mapping, payments, and admin controls (`apps/api`)
+- Addy bot family (`apps/bots/*`)
+- Shared business logic package (`packages/shared`)
+- Prisma schema for SaaS and bot configuration (`prisma/schema.prisma`)
 
-## Apps
-- `apps/website`: public premium static-style marketing app and docs.
-- `apps/dashboard`: user dashboard for guild-level bot management.
-- `apps/admin`: owner super admin panel (pricing, bots, payments, grants, secrets).
-- `apps/api`: Express + Prisma API for auth, guild mapping, bots, billing, and admin operations.
-- `apps/bots/*`: 10 separate Addy Discord bot services, each with slash commands, config loading, and runtime.
-- `apps/bot-runner`: helper launcher for specific Addy bots.
+## Monorepo Structure
 
-## Shared package
-- `packages/shared`: cross-app constants, bot catalog, tier pricing, and feature gating helpers.
+- `apps/website`: public SaaS website with catalog, bot details, pricing, docs, legal, status pages.
+- `apps/dashboard`: owner dashboard for guild/server bot management.
+- `apps/admin`: super admin panel for bot catalog, pricing, access grants, payments, secrets.
+- `apps/api`: Express + Prisma backend for auth, guilds, settings, premium, payments, content.
+- `apps/bots`: separate Discord bot services:
+  - `addy-main`, `addy-mod`, `addy-music`, `addy-notify`, `addy-welcome`, `addy-level`, `addy-ticket`, `addy-utility`, `addy-guard`, `addy-ai`.
+- `packages/shared`: shared types, constants, validators, pricing matrix, feature-gate helpers.
+- `prisma`: relational data models.
 
-## Database
-- Prisma schema includes users, sessions, guilds, installs, subscriptions, payments, coupons, pricing rules, audit logs,
-  analytics snapshots, and all requested settings models.
+## Quick Start
 
-## Quickstart
-1. `cp .env.example .env`
-2. `pnpm install`
-3. `pnpm db:generate`
-4. `pnpm db:migrate --name init`
-5. `pnpm db:seed`
-6. `pnpm dev`
+1. Install dependencies:
+   ```bash
+   pnpm install
+   ```
+2. Copy environment values:
+   ```bash
+   cp .env.example .env
+   ```
+3. Generate Prisma client and run migrations:
+   ```bash
+   pnpm db:generate
+   pnpm db:migrate
+   ```
+4. Run all apps in development:
+   ```bash
+   pnpm dev
+   ```
 
-Run a single service:
-- API: `pnpm --filter @addy/api dev`
-- Website: `pnpm --filter @addy/website dev`
-- Dashboard: `pnpm --filter @addy/dashboard dev`
-- Admin: `pnpm --filter @addy/admin dev`
-- Individual bot: `pnpm --filter @addy/addy-mod dev`
-- Via runner: `pnpm --filter @addy/bot-runner dev addy-mod`
+### App ports
+- Website: `http://localhost:3000`
+- Dashboard: `http://localhost:3001`
+- Admin: `http://localhost:3002`
+- API: `http://localhost:4000`
 
-## Billing model
-- Global tiers: Free, Addy Basic, Addy Pro, Addy Premium, Addy Ultimate, Enterprise.
-- Per-bot addon and suite pricing from `@addy/shared`.
-- Manual checkout endpoint supports Stripe/Razorpay/PayPal/UPI/manual workflows via payment method field and admin verification.
+## API Highlights
 
-## Secret key management
-- `BotConfig` table stores per-bot client ID/token/invite/status/plan and visibility fields.
-- Admin UI includes dedicated secret-management section.
+- `POST /api/auth/signup`
+- `POST /api/auth/login`
+- `GET /api/auth/discord/url`
+- `GET /api/auth/me`
+- `GET /api/guilds`
+- `POST /api/guilds/sync`
+- `PUT /api/guilds/settings`
+- `GET /api/pricing/plans`
+- `GET /api/pricing/bots`
+- `POST /api/payments/checkout`
+- `GET /api/payments/history`
+- `POST /api/premium/activate-trial`
+- `GET /api/admin/overview`
+- `POST /api/admin/bots`
+- `PATCH /api/admin/payments/:id`
+- `POST /api/admin/grants/free`
+- `POST /api/admin/grants/trial`
+
+## Payment Modes
+- Stripe, Razorpay, PayPal, manual approval, UPI-focused manual mode.
+- Manual and UPI payments enter `PENDING` review flow for owner approval.
+
+## Bot Runtime
+Each bot is independently runnable:
+```bash
+pnpm --filter @addy/addy-mod dev
+pnpm --filter @addy/addy-music dev
+```
+
+All bots share a registration and runtime framework in `apps/bots/_core/src/framework.ts`.
+
+## Premium and Feature Gating
+- Tier matrix and features in `packages/shared/src/pricing/plans.ts`.
+- Access resolver in `packages/shared/src/utils/feature-gate.ts`.
+- Guild subscriptions and trial grants in Prisma models.
+

@@ -6,12 +6,11 @@
       "outputs": ["dist/**", ".next/**"]
     },
     "dev": {
-      "cache": false,
-      "persistent": true
+      "cache": false
     },
-    "lint": {},
     "typecheck": {
       "dependsOn": ["^typecheck"]
-    }
+    },
+    "lint": {}
   }
 }

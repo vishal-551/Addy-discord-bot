@@ -1,54 +1,47 @@
 import { Router } from "express";
+import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { requireAdmin, requireAuth } from "../middleware/auth.js";
 
-const router = Router();
-router.use(requireAuth, requireAdmin);
+export const adminRouter = Router();
+adminRouter.use(requireAuth, requireAdmin);
 
-router.get("/overview", async (_req, res) => {
-  const [users, guilds, subscriptions, payments] = await Promise.all([
+adminRouter.get("/overview", async (_req, res) => {
+  const [users, guilds, payments] = await Promise.all([
     prisma.user.count(),
     prisma.guild.count(),
-    prisma.subscription.count(),
-    prisma.payment.count()
+    prisma.payment.aggregate({ _sum: { amount: true } })
   ]);
-  res.json({ users, guilds, subscriptions, payments });
+  res.json({ users, guilds, revenue: payments._sum.amount ?? 0 });
 });
 
-router.get("/users", async (_req, res) => res.json(await prisma.user.findMany({ take: 100 })));
-router.get("/guilds", async (_req, res) => res.json(await prisma.guild.findMany({ take: 100 })));
-router.get("/payments", async (_req, res) => res.json(await prisma.payment.findMany({ take: 200, orderBy: { createdAt: "desc" } })));
-router.get("/bots", async (_req, res) => res.json(await prisma.botConfig.findMany()));
-
-router.post("/bots", async (req, res) => {
-  const bot = await prisma.botConfig.create({ data: req.body });
-  res.json(bot);
+const botSchema = z.object({
+  key: z.string(), slug: z.string(), name: z.string(), description: z.string(), category: z.string(),
+  inviteUrl: z.string().url(), clientId: z.string(), tokenSecret: z.string(), status: z.enum(["LIVE", "BETA", "MAINTENANCE", "PAUSED"]),
+  planType: z.enum(["FREE", "PAID", "FREEMIUM", "CUSTOM"]), monthlyPrice: z.number(), yearlyPrice: z.number(),
+  lifetimePrice: z.number().nullable().optional(), featureList: z.array(z.string()), premiumFeatures: z.array(z.string()),
+  logoUrl: z.string().url().optional(), showOnWebsite: z.boolean(), showOnDashboard: z.boolean(), dashboardRoute: z.string()
 });
 
-router.put("/bots/:id", async (req, res) => {
-  const bot = await prisma.botConfig.update({ where: { id: req.params.id }, data: req.body });
-  res.json(bot);
+adminRouter.post("/bots", async (req, res) => {
+  const parsed = botSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json(parsed.error.flatten());
+  const bot = await prisma.botConfig.create({ data: { ...parsed.data, lifetimePrice: parsed.data.lifetimePrice ?? undefined } });
+  res.json({ bot });
 });
 
-router.post("/grants/premium", async (req, res) => {
-  const { userId, guildId, planKey, targetBotKey, endsAt } = req.body;
-  const subscription = await prisma.subscription.create({ data: { userId, guildId, planKey, targetBotKey, status: "manual_grant", endsAt } });
-  res.json(subscription);
+adminRouter.patch("/payments/:id", async (req, res) => {
+  const { status } = req.body as { status: "APPROVED" | "REJECTED" };
+  const payment = await prisma.payment.update({ where: { id: req.params.id }, data: { status, reviewedAt: new Date() } });
+  res.json({ payment });
 });
 
-router.post("/grants/free", async (req, res) => {
+adminRouter.post("/grants/free", async (req, res) => {
   const grant = await prisma.freeAccessGrant.create({ data: req.body });
-  res.json(grant);
+  res.json({ grant });
 });
 
-router.post("/grants/trial", async (req, res) => {
-  const trial = await prisma.trialGrant.create({ data: req.body });
-  res.json(trial);
+adminRouter.post("/grants/trial", async (req, res) => {
+  const grant = await prisma.trialGrant.create({ data: req.body });
+  res.json({ grant });
 });
-
-router.put("/payments/:id/status", async (req, res) => {
-  const payment = await prisma.payment.update({ where: { id: req.params.id }, data: { status: req.body.status } });
-  res.json(payment);
-});
-
-export default router;

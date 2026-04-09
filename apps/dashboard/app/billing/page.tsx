@@ -1,0 +1,1 @@
+export default function Billing(){return <main className="container"><h1>Premium & Billing</h1><p>Manage monthly, yearly, per-bot and full-suite subscriptions, invoices, status badges, and payment history.</p></main>}

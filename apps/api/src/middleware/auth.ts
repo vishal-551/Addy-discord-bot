@@ -1,26 +1,34 @@
-import { NextFunction, Request, Response } from "express";
+import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
-import { env } from "../config/env.js";
+import { env } from "../lib/env.js";
 
 export interface AuthRequest extends Request {
-  user?: { id: string; role: string };
+  userId?: string;
+  role?: string;
 }
 
-export const requireAuth = (req: AuthRequest, res: Response, next: NextFunction) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader?.startsWith("Bearer ")) return res.status(401).json({ error: "Unauthorized" });
+export const requireAuth = (req: AuthRequest, res: Response, next: NextFunction): void => {
+  const header = req.headers.authorization;
+  if (!header) {
+    res.status(401).json({ error: "Missing authorization header" });
+    return;
+  }
+
+  const token = header.replace("Bearer ", "");
   try {
-    const payload = jwt.verify(authHeader.slice(7), env.jwtSecret) as { id: string; role: string };
-    req.user = payload;
+    const payload = jwt.verify(token, env.jwtSecret) as { sub: string; role: string };
+    req.userId = payload.sub;
+    req.role = payload.role;
     next();
   } catch {
     res.status(401).json({ error: "Invalid token" });
   }
 };
 
-export const requireAdmin = (req: AuthRequest, res: Response, next: NextFunction) => {
-  if (req.user?.role !== "owner" && req.user?.role !== "admin") {
-    return res.status(403).json({ error: "Forbidden" });
+export const requireAdmin = (req: AuthRequest, res: Response, next: NextFunction): void => {
+  if (!req.role || !["ADMIN", "OWNER"].includes(req.role)) {
+    res.status(403).json({ error: "Admin access required" });
+    return;
   }
   next();
 };

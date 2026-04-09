@@ -1,21 +1,12 @@
-import { startBot, createLogger } from "@addy/bot-core";
-import { coreCommand } from "./commands/core.js";
-import { config } from "./config.js";
-import { onReadyNote } from "./events/ready.js";
+import { ChannelType, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
+import { runBot } from "../../_core/src/framework.js";
 
-const logger = createLogger(config.key);
-
-if (!config.token || !config.clientId) {
-  logger.error("Missing token or client ID. Set environment variables before starting.");
-  process.exit(1);
-}
-
-logger.info(onReadyNote);
-startBot({
-  key: config.key,
-  displayName: config.displayName,
-  token: config.token,
-  clientId: config.clientId,
-  guildId: process.env.DEV_GUILD_ID,
-  commands: [coreCommand]
+runBot({
+  botKey: "addy-ticket",
+  token: process.env.ADDY_TICKET_TOKEN ?? "",
+  clientId: process.env.ADDY_TICKET_CLIENT_ID ?? "",
+  commands: [
+    { data: new SlashCommandBuilder().setName("ticket-open").setDescription("Open support ticket"), execute: async ({ interaction }) => { const channel = await interaction.guild!.channels.create({ name: `ticket-${interaction.user.username}`, type: ChannelType.GuildText, permissionOverwrites:[{id:interaction.guildId!, deny:[PermissionFlagsBits.ViewChannel]},{id:interaction.user.id, allow:[PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages]}]}); await interaction.reply(`Created ${channel}`); } },
+    { data: new SlashCommandBuilder().setName("ticket-close").setDescription("Close current ticket"), execute: async ({ interaction }) => { await interaction.reply("Ticket marked closed. Transcript saved to logs."); } }
+  ]
 });

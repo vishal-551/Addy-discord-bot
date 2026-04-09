@@ -1,50 +1,46 @@
 import { Router } from "express";
+import { nanoid } from "nanoid";
+import { guildSettingsSchema } from "@addy/shared";
 import { prisma } from "../lib/prisma.js";
-import { AuthRequest, requireAuth } from "../middleware/auth.js";
+import { requireAuth, type AuthRequest } from "../middleware/auth.js";
 
-const router = Router();
-router.use(requireAuth);
+export const guildRouter = Router();
 
-router.get("/", async (req: AuthRequest, res) => {
-  const memberships = await prisma.guildMember.findMany({ where: { userId: req.user!.id }, include: { guild: true } });
-  res.json(memberships.map((m) => m.guild));
-});
+guildRouter.use(requireAuth);
 
-router.post("/sync", async (req: AuthRequest, res) => {
-  const guilds = req.body.guilds as Array<{ id: string; name: string }>;
-  const out = [];
-  for (const guild of guilds) {
-    const record = await prisma.guild.upsert({
-      where: { discordGuildId: guild.id },
-      update: { name: guild.name },
-      create: { discordGuildId: guild.id, name: guild.name, ownerDiscordId: req.user!.id }
-    });
-    await prisma.guildMember.upsert({
-      where: { userId_guildId: { userId: req.user!.id, guildId: record.id } },
-      update: { role: "owner" },
-      create: { userId: req.user!.id, guildId: record.id, role: "owner" }
-    });
-    out.push(record);
-  }
-  res.json(out);
-});
-
-router.get("/:guildId/settings", async (req, res) => {
-  const guild = await prisma.guild.findUnique({
-    where: { id: req.params.guildId },
-    include: {
-      installs: { include: { bot: true } },
-      welcomeSettings: true,
-      moderationSettings: true,
-      automodSettings: true,
-      youtubeSettings: true,
-      musicSettings: true,
-      levelSettings: true,
-      ticketSettings: true,
-      aiSettings: true
-    }
+guildRouter.get("/", async (req: AuthRequest, res) => {
+  const guilds = await prisma.guildMember.findMany({
+    where: { userId: req.userId, canManage: true },
+    include: { guild: true }
   });
-  res.json(guild);
+  res.json({ guilds: guilds.map((gm) => gm.guild) });
 });
 
-export default router;
+guildRouter.post("/sync", async (req: AuthRequest, res) => {
+  const payload = req.body as { discordGuildId: string; name: string; ownerDiscordId?: string };
+  const guild = await prisma.guild.upsert({
+    where: { discordGuildId: payload.discordGuildId },
+    create: {
+      discordGuildId: payload.discordGuildId,
+      name: payload.name,
+      ownerDiscordId: payload.ownerDiscordId,
+      internalCode: `ADDY-${nanoid(10)}`
+    },
+    update: { name: payload.name }
+  });
+  res.json({ guild });
+});
+
+guildRouter.put("/settings", async (req, res) => {
+  const parsed = guildSettingsSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json(parsed.error.flatten());
+
+  const { guildId, botKey, config } = parsed.data;
+  const updated = await prisma.featureFlag.upsert({
+    where: { guildId_botKey_flag: { guildId, botKey, flag: "custom-config" } },
+    create: { guildId, botKey, flag: "custom-config", enabled: true },
+    update: { enabled: true }
+  });
+
+  res.json({ updated, config });
+});
