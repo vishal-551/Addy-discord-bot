@@ -1,0 +1,17 @@
+{
+  "name": "@addy/addy-ai",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "echo 'lint addy-ai'"
+  },
+  "dependencies": {
+    "@addy/bot-core": "workspace:*",
+    "@addy/shared": "workspace:*",
+    "discord.js": "^14.16.3",
+    "tsx": "^4.19.1"
+  }
+}

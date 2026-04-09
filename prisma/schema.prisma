@@ -1,0 +1,323 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String   @id @default(cuid())
+  email           String   @unique
+  passwordHash    String
+  discordId       String?  @unique
+  discordUsername String?
+  role            String   @default("user")
+  isSuspended     Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  sessions      Session[]
+  guildMembers  GuildMember[]
+  subscriptions Subscription[]
+  payments      Payment[]
+  freeGrants    FreeAccessGrant[]
+  trialGrants   TrialGrant[]
+  auditLogs     AuditLog[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Guild {
+  id                String   @id @default(cuid())
+  discordGuildId    String   @unique
+  name              String
+  ownerDiscordId    String
+  onboardingStatus  String   @default("pending")
+  currentPlan       String   @default("free")
+  customPlanNote    String?
+  isSuspended       Boolean  @default(false)
+  createdAt         DateTime @default(now())
+
+  installs          GuildBotInstall[]
+  members           GuildMember[]
+  subscriptions     Subscription[]
+  featureFlags      FeatureFlag[]
+  welcomeSettings   WelcomeSettings?
+  moderationSettings ModerationSettings?
+  automodSettings   AutomodSettings?
+  youtubeSettings   YoutubeSettings?
+  musicSettings     MusicSettings?
+  levelSettings     LevelSettings?
+  ticketSettings    TicketSettings?
+  aiSettings        AISettings?
+}
+
+model GuildMember {
+  id      String @id @default(cuid())
+  userId  String
+  guildId String
+  role    String @default("admin")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, guildId])
+}
+
+model BotConfig {
+  id                String   @id @default(cuid())
+  key               String   @unique
+  displayName       String
+  slug              String   @unique
+  description       String
+  category          String
+  clientId          String
+  tokenSecret       String
+  inviteUrl         String
+  status            String   @default("live")
+  planType          String   @default("freemium")
+  monthlyPrice      Float    @default(0)
+  yearlyPrice       Float    @default(0)
+  lifetimePrice     Float    @default(0)
+  freeFeaturesJson  String
+  premiumFeaturesJson String
+  dashboardRouteKey String
+  isVisibleOnSite   Boolean  @default(true)
+  isVisibleInDashboard Boolean @default(true)
+  createdAt         DateTime @default(now())
+
+  installs GuildBotInstall[]
+}
+
+model GuildBotInstall {
+  id           String   @id @default(cuid())
+  guildId      String
+  botConfigId  String
+  installedAt  DateTime @default(now())
+  enabled      Boolean  @default(true)
+
+  guild    Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  bot      BotConfig @relation(fields: [botConfigId], references: [id], onDelete: Cascade)
+
+  @@unique([guildId, botConfigId])
+}
+
+model PremiumPlan {
+  id          String @id @default(cuid())
+  key         String @unique
+  displayName String
+  monthlyUsd  Float
+  yearlyUsd   Float
+  featuresJson String
+}
+
+model Subscription {
+  id            String   @id @default(cuid())
+  userId        String
+  guildId       String?
+  planKey       String
+  targetBotKey  String?
+  status        String   @default("active")
+  startedAt     DateTime @default(now())
+  renewsAt      DateTime?
+  endsAt        DateTime?
+
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guild   Guild? @relation(fields: [guildId], references: [id], onDelete: SetNull)
+  payments Payment[]
+}
+
+model Payment {
+  id              String   @id @default(cuid())
+  userId          String
+  subscriptionId  String?
+  guildId         String?
+  method          String
+  providerRef     String?
+  amountUsd       Float
+  status          String
+  currency        String   @default("USD")
+  createdAt       DateTime @default(now())
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+}
+
+model PricingRule {
+  id             String @id @default(cuid())
+  scope          String
+  key            String
+  trialDays      Int    @default(0)
+  yearlyDiscount Int    @default(0)
+  couponEnabled  Boolean @default(false)
+  payloadJson    String
+}
+
+model Coupon {
+  id            String   @id @default(cuid())
+  code          String   @unique
+  percentOff    Int
+  maxUses       Int
+  usedCount     Int      @default(0)
+  expiresAt     DateTime?
+  applicableTo  String
+}
+
+model FeatureFlag {
+  id       String @id @default(cuid())
+  guildId  String
+  key      String
+  value    Boolean @default(false)
+  source   String @default("plan")
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@unique([guildId, key])
+}
+
+model FreeAccessGrant {
+  id         String   @id @default(cuid())
+  userId      String
+  botKey      String?
+  guildId     String?
+  reason      String
+  expiresAt   DateTime?
+  createdBy   String
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model TrialGrant {
+  id           String   @id @default(cuid())
+  userId        String
+  botKey        String?
+  guildId       String?
+  daysGranted   Int
+  startedAt     DateTime @default(now())
+  endsAt        DateTime
+  createdBy     String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId    String
+  action     String
+  targetType String
+  targetId   String
+  payloadJson String
+  createdAt   DateTime @default(now())
+
+  actor User @relation(fields: [actorId], references: [id], onDelete: Cascade)
+}
+
+model AnalyticsSnapshot {
+  id             String   @id @default(cuid())
+  date           DateTime
+  activeGuilds   Int
+  activeUsers    Int
+  mrrUsd         Float
+  paymentsCount  Int
+  payloadJson    String
+
+  @@unique([date])
+}
+
+model WelcomeSettings {
+  id                  String @id @default(cuid())
+  guildId             String @unique
+  welcomeChannelId    String?
+  leaveChannelId      String?
+  welcomeMessage      String?
+  goodbyeMessage      String?
+  autoroleIdsJson     String @default("[]")
+  verificationEnabled Boolean @default(false)
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+}
+
+model ModerationSettings {
+  id                    String @id @default(cuid())
+  guildId               String @unique
+  logChannelId          String?
+  maxWarnings           Int    @default(3)
+  defaultPunishment     String @default("timeout")
+  slowmodeSeconds       Int    @default(0)
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+}
+
+model AutomodSettings {
+  id                 String @id @default(cuid())
+  guildId            String @unique
+  antiSpamEnabled    Boolean @default(true)
+  antiScamEnabled    Boolean @default(true)
+  antiPhishingEnabled Boolean @default(true)
+  antiRaidEnabled    Boolean @default(false)
+  advancedAiEnabled  Boolean @default(false)
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+}
+
+model YoutubeSettings {
+  id                  String @id @default(cuid())
+  guildId             String @unique
+  channelsJson        String @default("[]")
+  pollingIntervalMins Int    @default(10)
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+}
+
+model MusicSettings {
+  id                   String @id @default(cuid())
+  guildId              String @unique
+  defaultVolume        Int    @default(80)
+  djRoleId             String?
+  hqAudioEnabled       Boolean @default(false)
+  smartAutoplayEnabled Boolean @default(false)
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+}
+
+model LevelSettings {
+  id                    String @id @default(cuid())
+  guildId               String @unique
+  xpPerMessageMin       Int    @default(5)
+  xpPerMessageMax       Int    @default(15)
+  voiceXpPerMinute      Int    @default(1)
+  roleRewardsJson       String @default("[]")
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+}
+
+model TicketSettings {
+  id                   String @id @default(cuid())
+  guildId              String @unique
+  panelChannelId       String?
+  transcriptChannelId  String?
+  closeAfterHours      Int    @default(48)
+  advancedFormsEnabled Boolean @default(false)
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+}
+
+model AISettings {
+  id                     String @id @default(cuid())
+  guildId                String @unique
+  autoReplyEnabled       Boolean @default(false)
+  moderationAssist       Boolean @default(true)
+  setupAssistantEnabled  Boolean @default(true)
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+}
