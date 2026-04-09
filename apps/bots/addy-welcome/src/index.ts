@@ -1,21 +1,19 @@
-import { startBot, createLogger } from "@addy/bot-core";
-import { coreCommand } from "./commands/core.js";
-import { config } from "./config.js";
-import { onReadyNote } from "./events/ready.js";
+import { Events, SlashCommandBuilder } from "discord.js";
+import { runBot } from "../../_core/src/framework.js";
 
-const logger = createLogger(config.key);
+const welcomeChannel = new Map<string, string>();
 
-if (!config.token || !config.clientId) {
-  logger.error("Missing token or client ID. Set environment variables before starting.");
-  process.exit(1);
-}
-
-logger.info(onReadyNote);
-startBot({
-  key: config.key,
-  displayName: config.displayName,
-  token: config.token,
-  clientId: config.clientId,
-  guildId: process.env.DEV_GUILD_ID,
-  commands: [coreCommand]
+runBot({
+  botKey: "addy-welcome",
+  token: process.env.ADDY_WELCOME_TOKEN ?? "",
+  clientId: process.env.ADDY_WELCOME_CLIENT_ID ?? "",
+  commands: [{ data: new SlashCommandBuilder().setName("welcome-channel").setDescription("Set welcome channel").addChannelOption(o=>o.setName("channel").setDescription("target").setRequired(true)), execute: async ({ interaction }) => { const channel = interaction.options.getChannel("channel", true); welcomeChannel.set(interaction.guildId!, channel.id); await interaction.reply(`Welcome channel set to <#${channel.id}>`);} }],
+  onReady: async (client) => {
+    client.on(Events.GuildMemberAdd, async (member) => {
+      const id = welcomeChannel.get(member.guild.id);
+      if (!id) return;
+      const channel = member.guild.channels.cache.get(id);
+      if (channel?.isTextBased()) await channel.send(`👋 Welcome ${member} to ${member.guild.name}`);
+    });
+  }
 });

@@ -1,0 +1,1 @@
+export default function UtilitySettings(){return <main className="container"><h1>Utility Settings</h1><div className="card"><label>Enable utility</label><select><option>Enabled</option><option>Disabled</option></select></div><div className="card"><label>JSON Config</label><textarea rows={8} defaultValue='{"example":true}'/></div></main>}

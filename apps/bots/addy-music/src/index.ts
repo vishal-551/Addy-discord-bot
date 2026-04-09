@@ -1,21 +1,15 @@
-import { startBot, createLogger } from "@addy/bot-core";
-import { coreCommand } from "./commands/core.js";
-import { config } from "./config.js";
-import { onReadyNote } from "./events/ready.js";
+import { SlashCommandBuilder } from "discord.js";
+import { runBot } from "../../_core/src/framework.js";
 
-const logger = createLogger(config.key);
+const queue = new Map<string, string[]>();
 
-if (!config.token || !config.clientId) {
-  logger.error("Missing token or client ID. Set environment variables before starting.");
-  process.exit(1);
-}
-
-logger.info(onReadyNote);
-startBot({
-  key: config.key,
-  displayName: config.displayName,
-  token: config.token,
-  clientId: config.clientId,
-  guildId: process.env.DEV_GUILD_ID,
-  commands: [coreCommand]
+runBot({
+  botKey: "addy-music",
+  token: process.env.ADDY_MUSIC_TOKEN ?? "",
+  clientId: process.env.ADDY_MUSIC_CLIENT_ID ?? "",
+  commands: [
+    { data: new SlashCommandBuilder().setName("play").setDescription("Queue a song URL").addStringOption(o=>o.setName("query").setDescription("url or query").setRequired(true)), execute: async ({ interaction }) => { const q = interaction.options.getString("query", true); const key = interaction.guildId!; queue.set(key, [...(queue.get(key) ?? []), q]); await interaction.reply(`🎵 Queued: ${q}`); } },
+    { data: new SlashCommandBuilder().setName("queue").setDescription("Show queue"), execute: async ({ interaction }) => { const items = queue.get(interaction.guildId!) ?? []; await interaction.reply(items.length ? items.map((s,i)=>`${i+1}. ${s}`).join("\n") : "Queue is empty"); } },
+    { data: new SlashCommandBuilder().setName("skip").setDescription("Skip current song"), execute: async ({ interaction }) => { const items = queue.get(interaction.guildId!) ?? []; items.shift(); queue.set(interaction.guildId!, items); await interaction.reply("⏭️ Skipped"); } }
+  ]
 });

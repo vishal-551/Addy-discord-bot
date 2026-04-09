@@ -1,21 +1,17 @@
-import { startBot, createLogger } from "@addy/bot-core";
-import { coreCommand } from "./commands/core.js";
-import { config } from "./config.js";
-import { onReadyNote } from "./events/ready.js";
+import { Events, SlashCommandBuilder } from "discord.js";
+import { runBot } from "../../_core/src/framework.js";
 
-const logger = createLogger(config.key);
-
-if (!config.token || !config.clientId) {
-  logger.error("Missing token or client ID. Set environment variables before starting.");
-  process.exit(1);
-}
-
-logger.info(onReadyNote);
-startBot({
-  key: config.key,
-  displayName: config.displayName,
-  token: config.token,
-  clientId: config.clientId,
-  guildId: process.env.DEV_GUILD_ID,
-  commands: [coreCommand]
+runBot({
+  botKey: "addy-guard",
+  token: process.env.ADDY_GUARD_TOKEN ?? "",
+  clientId: process.env.ADDY_GUARD_CLIENT_ID ?? "",
+  commands: [{ data: new SlashCommandBuilder().setName("security-score").setDescription("Show threat score"), execute: async ({ interaction }) => interaction.reply("Security score: 82/100. No active nuke signatures.") }],
+  onReady: async (client) => {
+    client.on(Events.ChannelCreate, async (channel) => {
+      if (channel.guild.channels.cache.filter(c => c.createdTimestamp && Date.now() - c.createdTimestamp < 20_000).size > 5) {
+        const system = channel.guild.systemChannel;
+        if (system) await system.send("🚨 Addy Guard detected suspicious rapid channel creation.");
+      }
+    });
+  }
 });

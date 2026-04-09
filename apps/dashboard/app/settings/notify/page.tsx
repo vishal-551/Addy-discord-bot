@@ -1,0 +1,1 @@
+export default function NotifySettings(){return <main className="container"><h1>Notify Settings</h1><div className="card"><label>Enable notify</label><select><option>Enabled</option><option>Disabled</option></select></div><div className="card"><label>JSON Config</label><textarea rows={8} defaultValue='{"example":true}'/></div></main>}
